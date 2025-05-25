@@ -217,11 +217,20 @@ class SessionApiKeyMiddleware:
     async def __call__(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
-        if request.method != 'OPTIONS' and request.url.path.startswith('/api'):
-            if self.session_api_key != request.headers.get('X-Session-API-Key'):
-                return JSONResponse(
-                    {'code': 'invalid_session_api_key'},
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                )
+        # Skip authentication for public endpoints
+        if request.method == 'OPTIONS' or not request.url.path.startswith('/api'):
+            return await call_next(request)
+            
+        # Allow access to public API endpoints without authentication
+        if request.url.path.startswith('/api/options/config'):
+            return await call_next(request)
+            
+        # Require authentication for all other API endpoints
+        if self.session_api_key != request.headers.get('X-Session-API-Key'):
+            return JSONResponse(
+                {'code': 'invalid_session_api_key'},
+                status_code=status.HTTP_401_UNAUTHORIZED,
+            )
+            
         response = await call_next(request)
         return response
